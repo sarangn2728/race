@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bike Racing Game</title>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    user-select: none;
+    font-family: "Segoe UI", sans-serif;
+}
+
+body {
+    background: linear-gradient(#0f2027, #203a43, #2c5364);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* GAME CONTAINER */
+#gameContainer {
+    width: 360px;
+    max-width: 100%;
+    height: 640px;
+    background: #333;
+    position: relative;
+    overflow: hidden;
+    border-radius: 15px;
+    box-shadow: 0 0 25px rgba(0,0,0,0.6);
+}
+
+/* ROAD */
+#road {
+    width: 100%;
+    height: 200%;
+    background: repeating-linear-gradient(
+        #444 0px,
+        #444 40px,
+        #fff 40px,
+        #fff 80px
+    );
+    position: absolute;
+    animation: roadMove 1s linear infinite;
+}
+
+@keyframes roadMove {
+    from { top: -100%; }
+    to { top: 0; }
+}
+
+/* BIKE */
+#bike {
+    width: 50px;
+    height: 90px;
+    position: absolute;
+    bottom: 20px;
+    left: 155px;
+    z-index: 10;
+}
+
+/* Bike design */
+#bike::before {
+    content: "";
+    position: absolute;
+    width: 40px;
+    height: 70px;
+    background: linear-gradient(red, darkred);
+    left: 5px;
+    top: 10px;
+    border-radius: 10px;
+}
+
+.wheel {
+    width: 18px;
+    height: 18px;
+    background: black;
+    border-radius: 50%;
+    position: absolute;
+}
+
+#wheel1 { bottom: 0; left: 0; }
+#wheel2 { bottom: 0; right: 0; }
+
+/* OBSTACLES */
+.obstacle {
+    width: 50px;
+    height: 80px;
+    background: linear-gradient(#2196f3, #0d47a1);
+    position: absolute;
+    border-radius: 8px;
+}
+
+.cone {
+    background: linear-gradient(orange, darkorange);
+    width: 40px;
+    height: 60px;
+}
+
+/* UI */
+#score {
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    color: #fff;
+    font-size: 18px;
+    z-index: 20;
+}
+
+#gameOver {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    color: white;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 30;
+}
+
+#gameOver h1 {
+    margin-bottom: 10px;
+}
+
+button {
+    padding: 10px 20px;
+    border: none;
+    background: #ff5252;
+    color: white;
+    font-size: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #ff1744;
+}
+
+/* MOBILE TOUCH ZONES */
+.touchZone {
+    position: absolute;
+    bottom: 0;
+    width: 50%;
+    height: 100%;
+    z-index: 50;
+}
+
+#leftZone { left: 0; }
+#rightZone { right: 0; }
+</style>
+</head>
+
+<body>
+
+<div id="gameContainer">
+    <div id="road"></div>
+
+    <div id="score">Score: 0</div>
+
+    <div id="bike">
+        <div class="wheel" id="wheel1"></div>
+        <div class="wheel" id="wheel2"></div>
+    </div>
+
+    <div id="gameOver">
+        <h1>Game Over</h1>
+        <p id="finalScore"></p><br>
+        <button onclick="restartGame()">Restart</button>
+    </div>
+
+    <!-- Touch controls -->
+    <div class="touchZone" id="leftZone"></div>
+    <div class="touchZone" id="rightZone"></div>
+</div>
+
+<script>
+let bike = document.getElementById("bike");
+let container = document.getElementById("gameContainer");
+let scoreEl = document.getElementById("score");
+let gameOverScreen = document.getElementById("gameOver");
+let finalScore = document.getElementById("finalScore");
+
+let bikeX = 155;
+let speed = 4;
+let score = 0;
+let gameRunning = true;
+let obstacles = [];
+
+document.addEventListener("keydown", e => {
+    if (!gameRunning) return;
+    if (e.key === "ArrowLeft") moveBike(-20);
+    if (e.key === "ArrowRight") moveBike(20);
+});
+
+document.getElementById("leftZone").addEventListener("touchstart", () => moveBike(-25));
+document.getElementById("rightZone").addEventListener("touchstart", () => moveBike(25));
+
+function moveBike(val) {
+    bikeX += val;
+    bikeX = Math.max(10, Math.min(300, bikeX));
+    bike.style.left = bikeX + "px";
+}
+
+function createObstacle() {
+    if (!gameRunning) return;
+
+    let obs = document.createElement("div");
+    obs.classList.add("obstacle");
+
+    if (Math.random() > 0.5) obs.classList.add("cone");
+
+    obs.style.left = Math.floor(Math.random() * 280 + 20) + "px";
+    obs.style.top = "-100px";
+
+    container.appendChild(obs);
+    obstacles.push(obs);
+}
+
+function gameLoop() {
+    if (!gameRunning) return;
+
+    obstacles.forEach((obs, index) => {
+        let y = obs.offsetTop + speed;
+        obs.style.top = y + "px";
+
+        if (collision(bike, obs)) {
+            endGame();
+        }
+
+        if (y > 700) {
+            obs.remove();
+            obstacles.splice(index, 1);
+            score++;
+            scoreEl.innerText = "Score: " + score;
+            speed += 0.02;
+        }
+    });
+
+    requestAnimationFrame(gameLoop);
+}
+
+function collision(a, b) {
+    let ar = a.getBoundingClientRect();
+    let br = b.getBoundingClientRect();
+
+    return !(
+        ar.top > br.bottom ||
+        ar.bottom < br.top ||
+        ar.left > br.right ||
+        ar.right < br.left
+    );
+}
+
+function endGame() {
+    gameRunning = false;
+    finalScore.innerText = "Score: " + score;
+    gameOverScreen.style.display = "flex";
+}
+
+function restartGame() {
+    location.reload();
+}
+
+setInterval(createObstacle, 1200);
+gameLoop();
+</script>
+
+</body>
+</html>
+
